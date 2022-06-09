@@ -15,6 +15,7 @@ class PNGDataset(Dataset):
         super().__init__()
         assert mode in ['train', 'valid', 'test']
         X, y = [], []
+        self.label_name = []
         for file in os.listdir(data_path):
             category_name = file[:-8]   # category_name_png.npz
             data = np.load(os.path.join(data_path, file))[mode] # (len, 28, 28)
@@ -22,6 +23,7 @@ class PNGDataset(Dataset):
             label = np.ones(np.shape(data)[0], dtype=int) * label_no
             X.append(data)
             y.append(label)
+            self.label_name.append(category_name)
 
         self.X = np.concatenate(X)
         self.y = np.concatenate(y)

@@ -1,4 +1,5 @@
 import argparse
+from cProfile import label
 import os
 import random
 from os.path import join
@@ -26,7 +27,7 @@ def parse_args():
 
     p = parser.add_argument_group("Train")
     p.add_argument("--batch_size", type=int, default=100)
-    p.add_argument("--lr", type=float, default=1e-5)
+    p.add_argument("--lr", type=float, default=1e-4)
     p.add_argument("--epoch", type=int, default=10)
     p.add_argument("--seed", type=int, default=42)
 
@@ -107,6 +108,7 @@ if __name__ == '__main__':
                 if not os.path.exists(args.save_path):
                     os.makedirs(args.save_path)
                 torch.save(model.state_dict(), path)
+                best_acc = acc
 
     print('[CNN baseline] Test begin!')
     total_test_steps = len(test_loader)
@@ -129,10 +131,14 @@ if __name__ == '__main__':
         y_pred = np.concatenate(y_pred)
         acc = accuracy_score(y_true, y_pred)
         print('done. Test accuracy: %.4f' % acc)
+    plt.rcParams['figure.figsize'] = (16, 12)
     disp = ConfusionMatrixDisplay.from_predictions(
         y_true, 
         y_pred, 
-        normalize='all', 
-        values_format='.3f'
+        normalize=None, 
+        display_labels=test_dataset.label_name, 
+        xticks_rotation=45,
+        # values_format='.3f'
     )
+    # plt.show()
     plt.savefig('figures/baselineCNN.png')
