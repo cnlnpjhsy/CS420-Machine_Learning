@@ -37,3 +37,31 @@ class PNGDataset(Dataset):
         tensor_y = torch.tensor(self.y[idx]).long()
         return tensor_x, tensor_y
         
+
+class RAWDataset(Dataset):
+    def __init__(self, mode: str, data_path: str) -> None:
+        super().__init__()
+        assert mode in ['train', 'valid', 'test']
+        X, y = [], []
+        self.label_name = []
+        for file in os.listdir(data_path):
+            category_name = file[:-4]   # category_name.npz
+            data = np.load(os.path.join(data_path, file), encoding='latin1', allow_pickle=True)[mode]   # (len, 3)
+            label_no = int(label_dict[category_name])
+            label = np.ones(np.shape(data)[0], dtype=int) * label_no
+            X.append(data)
+            y.append(label)
+            self.label_name.append(category_name)
+
+        self.X = np.concatenate(X)
+        self.y = np.concatenate(y)
+        print('Loaded %d samples from %s dataset.' % (self.__len__(), mode))
+
+    def __len__(self):
+        return np.shape(self.X)[0]
+
+    def __getitem__(self, idx):
+        tensor_x = torch.tensor(self.X[idx]).float()    # (len, 3, )
+        tensor_y = torch.tensor(self.y[idx]).long()     # (, )
+        return tensor_x, tensor_y
+        
