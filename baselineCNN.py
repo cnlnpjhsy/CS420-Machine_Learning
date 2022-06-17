@@ -59,6 +59,7 @@ if __name__ == '__main__':
     valid_loader = DataLoader(valid_dataset, args.batch_size)
     test_loader = DataLoader(test_dataset, args.batch_size)
 
+    # model = ResNet([3,4,6,3]).to(device)
     model = baselineCNN((1, 28, 28), 25).to(device)
     loss_func = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
