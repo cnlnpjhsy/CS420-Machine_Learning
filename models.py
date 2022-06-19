@@ -4,6 +4,8 @@ import torch.nn.functional as F
 import torch.nn.utils.rnn as rnn_utils
 import numpy as np
 
+from ResNet50 import ResNet
+
 
 class baselineCNN(nn.Module):
     def __init__(self, input_shape: tuple, n_labels: int) -> None:
@@ -102,3 +104,129 @@ class SimpleTwoBranch(nn.Module):
         y = self.fc(x)
 
         return y
+
+
+class PositionTwoBranch(nn.Module):
+    def __init__(self, input_size: int, image_shape: tuple, n_labels: int, hidden_size=256) -> None:
+        super().__init__()
+        self.lstm1 = nn.LSTM(input_size + 2, hidden_size, batch_first=True, bidirectional=True)
+        self.conv = nn.Sequential(
+            nn.Conv2d(image_shape[0], 20, kernel_size=5),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(20, 50, kernel_size=5),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+        conv_out_size = self._get_conv_out(image_shape)
+        lstm_out_size = hidden_size * 2
+        self.fc = nn.Sequential(
+            nn.Linear(conv_out_size + lstm_out_size, 500),
+            nn.ReLU(),
+            nn.Linear(500, 250),
+            nn.ReLU(),
+            nn.Linear(250, n_labels)
+        )
+    
+    def _get_conv_out(self, shape):
+        o = self.conv(torch.zeros(1, *shape))
+        return int(np.prod(o.size()))
+
+    def forward(self, seq_x, seq_x_abs, img_x, seq_x_len):
+        combined_x = torch.cat([seq_x_abs, seq_x], dim=2)
+        packed_input = rnn_utils.pack_padded_sequence(
+            combined_x, seq_x_len, batch_first=True, enforce_sorted=False
+        )
+        packed_output, (hx, cx) = self.lstm1(packed_input)
+        # points_attention, _ = rnn_utils.pad_packed_sequence(packed_output, batch_first=True)
+        # points_attention = torch.sigmoid(self.attention_fc(points_attention))   # (batch_size, seq_x_size, 1)
+        
+        # rnn_in = torch.cat([points_attention, seq_x_abs], dim=2)   # (batch_size, seq_x_size, 3)
+        # rnn_out, (hx, cx) = self.lstm2(rnn_in)
+        hx_L = hx[-2]
+        hx_R = hx[-1]
+        seq_x = torch.cat((hx_L, hx_R), dim=1)
+
+        img_x = self.conv(img_x / 255.0)
+        img_x = img_x.view(img_x.size()[0], -1) # Flatten
+
+        x = torch.cat([seq_x, img_x], dim=1)
+        y = self.fc(x)
+
+        return y
+
+
+class HashingTwoBranch(nn.Module):
+    def __init__(self, input_size: int, image_shape: tuple, n_labels: int, hidden_size=256) -> None:
+        super().__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True, bidirectional=True)
+        self.conv = nn.Sequential(
+            nn.Conv2d(image_shape[0], 20, kernel_size=5),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(20, 50, kernel_size=5),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+        conv_out_size = self._get_conv_out(image_shape)
+        lstm_out_size = hidden_size * 2
+        self.fc = nn.Sequential(
+            nn.Linear(conv_out_size + lstm_out_size, 500),
+            nn.ReLU(),
+            nn.Linear(500, 250),
+            nn.Sigmoid()
+        )   # output: binary hashing code
+        self.clf = nn.Linear(250, n_labels)
+    
+    def _get_conv_out(self, shape):
+        o = self.conv(torch.zeros(1, *shape))
+        return int(np.prod(o.size()))
+
+    def forward(self, seq_x, img_x, seq_x_len):
+        packed_input = rnn_utils.pack_padded_sequence(
+            seq_x, seq_x_len, batch_first=True, enforce_sorted=False
+        )
+        packed_output, (hx, cx) = self.lstm(packed_input)
+        hx_L = hx[-2]
+        hx_R = hx[-1]
+        seq_x = torch.cat((hx_L, hx_R), dim=1)
+
+        img_x = self.conv(img_x / 255.0)
+        img_x = img_x.view(img_x.size()[0], -1) # Flatten
+
+        x = torch.cat([seq_x, img_x], dim=1)
+        code = self.fc(x)
+        y = self.clf(code)
+        return code, y
+
+
+class HashingResNet(nn.Module):
+    def __init__(self, input_size: int, image_shape: tuple, n_labels: int, hidden_size=256) -> None:
+        super().__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True, bidirectional=True)
+        self.conv = ResNet([3, 4, 6, 3])
+        conv_out_size = 800
+        lstm_out_size = hidden_size * 2
+        self.fc = nn.Sequential(
+            nn.Linear(conv_out_size + lstm_out_size, 500),
+            nn.ReLU(),
+            nn.Linear(500, 250),
+            nn.Sigmoid()
+        )   # output: binary hashing code
+        self.clf = nn.Linear(250, n_labels)
+    
+    def forward(self, seq_x, img_x, seq_x_len):
+        packed_input = rnn_utils.pack_padded_sequence(
+            seq_x, seq_x_len, batch_first=True, enforce_sorted=False
+        )
+        packed_output, (hx, cx) = self.lstm(packed_input)
+        hx_L = hx[-2]
+        hx_R = hx[-1]
+        seq_x = torch.cat((hx_L, hx_R), dim=1)
+
+        img_x = self.conv(img_x / 255.0)
+
+        x = torch.cat([seq_x, img_x], dim=1)
+        code = self.fc(x)
+        y = self.clf(code)
+        return code, y

@@ -1,3 +1,4 @@
+from turtle import forward
 import torch
 import math
 import torch.nn as nn
@@ -44,21 +45,20 @@ class ResNet(nn.Module):
     """
     block: A sub module
     """
-    def __init__(self, layers, num_classes=1000, model_path="model.pkl"):
+    def __init__(self, layers):
         super(ResNet, self).__init__()
-        self.inplanes = 64
-        self.modelPath = model_path
-        self.conv1 = nn.Conv2d(1, 64, kernel_size = 5, stride = 1, padding = 3,
+        self.inplanes = 25
+        self.conv1 = nn.Conv2d(1, 25, kernel_size = 5, stride = 1, padding = 3,
                                bias = False)
-        self.bn1 = nn.BatchNorm2d(64)
+        self.bn1 = nn.BatchNorm2d(25)
         self.relu = nn.ReLU(inplace = True)
         self.maxpool = nn.MaxPool2d(kernel_size = 3, stride = 2, padding = 1)
-        self.stack1 = self.make_stack(64, layers[0])
-        self.stack2 = self.make_stack(128, layers[1], stride=2)
-        self.stack3 = self.make_stack(256, layers[2], stride=2)
-        self.stack4 = self.make_stack(512, layers[3], stride=2)
+        self.stack1 = self.make_stack(25, layers[0])
+        self.stack2 = self.make_stack(50, layers[1], stride=2)
+        self.stack3 = self.make_stack(100, layers[2], stride=2)
+        self.stack4 = self.make_stack(200, layers[3], stride=2)
         self.avgpool = nn.AvgPool2d(2, stride = 1)
-        self.fc = nn.Linear(512 * Bottleneck.expansion, num_classes)
+        # self.fc = nn.Linear(200 * Bottleneck.expansion, num_classes)
         # initialize parameters
         self.init_param()
 
@@ -107,6 +107,19 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        x = self.fc(x)
+        # x = self.fc(x)
 
         return x
+
+
+class ResNetCNN(nn.Module):
+    def __init__(self, layers, num_classes) -> None:
+        super().__init__()
+        self.resnet = ResNet(layers)
+        self.fc = nn.Linear(200 * Bottleneck.expansion, num_classes)
+
+    def forward(self, x):
+        x = self.resnet(x)
+        y = self.fc(x)
+
+        return y
