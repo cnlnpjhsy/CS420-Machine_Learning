@@ -11,7 +11,7 @@ from sklearn.metrics import ConfusionMatrixDisplay, accuracy_score
 from torch.utils.data import DataLoader
 
 from data_processor import PNGDataset
-from models import baselineCNN
+from ResNet50 import ResNetCNN
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     valid_loader = DataLoader(valid_dataset, args.batch_size)
     test_loader = DataLoader(test_dataset, args.batch_size)
 
-    model = baselineCNN((1, 28, 28), 25).to(device)
+    model = ResNetCNN([3, 4, 6, 3], 25).to(device)
     loss_func = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         total_train_steps = len(train_loader)
         total_valid_steps = len(valid_loader)
         best_acc = 0.
-        print('[CNN baseline] Train begin!')
+        print('[CNN ResNet] Train begin!')
         for ep in range(1, args.epoch + 1):
             model.train()
             for i, batch in enumerate(train_loader):
@@ -80,7 +80,7 @@ if __name__ == '__main__':
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                print(f'\r[CNN baseline][Epoch {ep}/{args.epoch}] Training > {i + 1}/{total_train_steps} Loss: {loss.item():.3f}', end='')
+                print(f'\r[CNN ResNet][Epoch {ep}/{args.epoch}] Training > {i + 1}/{total_train_steps} Loss: {loss.item():.3f}', end='')
             print()
             
             with torch.no_grad():
@@ -95,23 +95,23 @@ if __name__ == '__main__':
                     pred = logits.argmax(1)
                     y_true.append(batch_y.data.numpy())
                     y_pred.append(pred.data.cpu().numpy())
-                    print(f'\r[CNN baseline][Epoch {ep}/{args.epoch}] Validating > {i + 1}/{total_valid_steps} ...', end='')
+                    print(f'\r[CNN ResNet][Epoch {ep}/{args.epoch}] Validating > {i + 1}/{total_valid_steps} ...', end='')
                 y_true = np.concatenate(y_true)
                 y_pred = np.concatenate(y_pred)
                 acc = accuracy_score(y_true, y_pred)
                 print('done. Validation accuracy: %.4f' % acc)
 
             if acc > best_acc:
-                print(f'[CNN baseline][Epoch {ep}/{args.epoch}] *** New best! *** Accuracy: {acc:.4f}')
-                path = join(args.save_path, 'baselineCNN.bin')
+                print(f'[CNN ResNet][Epoch {ep}/{args.epoch}] *** New best! *** Accuracy: {acc:.4f}')
+                path = join(args.save_path, 'ResNetCNN.bin')
                 if not os.path.exists(args.save_path):
                     os.makedirs(args.save_path)
                 torch.save(model.state_dict(), path)
                 best_acc = acc
 
-    print('[CNN baseline] Test begin!')
+    print('[CNN ResNet] Test begin!')
     total_test_steps = len(test_loader)
-    path = join(args.save_path, 'baselineCNN.bin')
+    path = join(args.save_path, 'ResNetCNN.bin')
     with torch.no_grad():
         model.load_state_dict(torch.load(path))
         model.eval()
@@ -125,7 +125,7 @@ if __name__ == '__main__':
             pred = logits.argmax(1)
             y_true.append(batch_y.data.numpy())
             y_pred.append(pred.data.cpu().numpy())
-            print(f'\r[CNN baseline] Testing > {i + 1}/{total_test_steps} ...', end='')
+            print(f'\r[CNN ResNet] Testing > {i + 1}/{total_test_steps} ...', end='')
         y_true = np.concatenate(y_true)
         y_pred = np.concatenate(y_pred)
         acc = accuracy_score(y_true, y_pred)
@@ -140,4 +140,4 @@ if __name__ == '__main__':
         # values_format='.3f'
     )
     # plt.show()
-    plt.savefig('figures/baselineCNN.png')
+    plt.savefig('figures/ResNetCNN.png')
